@@ -1,4 +1,4 @@
-package com.estudos.permissionsappexemple.presentation.viewmodel
+package com.estudos.permissionsappexemple.presentation.ui.viewmodel
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -65,7 +65,7 @@ class HomeViewModel(
                 state.copy(
                     galleryPermissionState = status.toUiState(
                         rationaleMessage = "Precisamos de acesso à galeria para selecionar imagens.",
-                        onOpenSettings = { onOpenSettings() },
+                        onOpenSettings = { onOpenSettings(PermissionType.GALLERY) },
                         onRequestPermission = { /* Será tratado pela UI */ }
                     )
                 )
@@ -104,7 +104,7 @@ class HomeViewModel(
                 state.copy(
                     cameraPermissionState = status.toUiState(
                         rationaleMessage = "Precisamos de acesso à câmera para tirar fotos.",
-                        onOpenSettings = { onOpenSettings() },
+                        onOpenSettings = { onOpenSettings(PermissionType.CAMERA) },
                         onRequestPermission = { /* Será tratado pela UI */ }
                     )
                 )
@@ -145,7 +145,7 @@ class HomeViewModel(
             
             val uiState = newStatus.toUiState(
                 rationaleMessage = rationaleMessage,
-                onOpenSettings = { onOpenSettings() }
+                onOpenSettings = { onOpenSettings(permissionType) }
             )
             
             _uiState.update { state ->
@@ -186,11 +186,53 @@ class HomeViewModel(
     /**
      * Notifica o ViewModel que o usuário quer abrir as Configurações do app.
      * 
-     * A UI deve usar este estado para criar um Intent e abrir as configurações.
+     * Emite um estado que a UI observa para abrir as configurações.
+     * 
+     * @param permissionType Tipo de permissão que precisa ser habilitada
      */
-    fun onOpenSettings() {
-        // Este estado será observado pela UI para abrir as configurações
-        // Não precisamos fazer nada aqui, apenas sinalizar
+    fun onOpenSettings(permissionType: PermissionType) {
+        _uiState.update { it.copy(shouldOpenSettings = permissionType) }
+    }
+    
+    /**
+     * Notifica o ViewModel que as configurações foram abertas.
+     * Limpa o estado e prepara para verificar novamente quando o usuário voltar.
+     */
+    fun onSettingsOpened() {
+        _uiState.update { it.copy(shouldOpenSettings = null) }
+    }
+    
+    /**
+     * Verifica novamente o status de uma permissão após o usuário voltar das configurações.
+     * 
+     * Este método deve ser chamado quando o usuário retorna das configurações do app,
+     * para verificar se a permissão foi habilitada manualmente.
+     * 
+     * @param permissionType Tipo de permissão a verificar
+     */
+    fun recheckPermission(permissionType: PermissionType) {
+        viewModelScope.launch {
+            val status = checkPermissionUseCase(permissionType)
+            
+            val rationaleMessage = when (permissionType) {
+                PermissionType.GALLERY -> "Precisamos de acesso à galeria para selecionar imagens."
+                PermissionType.CAMERA -> "Precisamos de acesso à câmera para tirar fotos."
+                PermissionType.FILE_PICKER -> ""
+            }
+            
+            val uiState = status.toUiState(
+                rationaleMessage = rationaleMessage,
+                onOpenSettings = { onOpenSettings(permissionType) }
+            )
+            
+            _uiState.update { state ->
+                when (permissionType) {
+                    PermissionType.GALLERY -> state.copy(galleryPermissionState = uiState)
+                    PermissionType.CAMERA -> state.copy(cameraPermissionState = uiState)
+                    PermissionType.FILE_PICKER -> state.copy(filePickerPermissionState = uiState)
+                }
+            }
+        }
     }
     
     /**
@@ -232,4 +274,5 @@ enum class OperationSource {
     CAMERA,
     FILE_PICKER
 }
+
 

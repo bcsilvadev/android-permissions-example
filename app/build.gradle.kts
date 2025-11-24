@@ -38,12 +38,6 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "2.2.21"
-    }
-    kotlin {
-        jvmToolchain(8)
-    }
 }
 
 dependencies {

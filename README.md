@@ -318,6 +318,9 @@ takePictureLauncher.launch(imageUri)
 - `onTakePhoto()`: Inicia fluxo de tirar foto
 - `onPermissionResult()`: Processa resultado de solicitação de permissão
 - `onOperationResult()`: Processa resultado de operação (URI selecionado)
+- `onOpenSettings(permissionType)`: Emite estado para abrir configurações do app
+- `onSettingsOpened()`: Limpa estado após abrir configurações
+- `recheckPermission(permissionType)`: Verifica novamente status da permissão após usuário voltar das configurações
 
 **Fluxo típico**:
 ```
@@ -376,6 +379,7 @@ when (val state = uiState.galleryPermissionState) {
 - Estados de permissão para cada feature (gallery, camera, filePicker)
 - URIs de resultados (selectedImageUri, selectedFileUri, cameraImageUri)
 - Estados de operação (isLoading, errorMessage)
+- `shouldOpenSettings`: Controla quando abrir as configurações do app (tipo de permissão que precisa ser habilitada)
 
 **Funções auxiliares**:
 - `hasSelectedImage()`: Verifica se há imagem para exibir
@@ -441,6 +445,12 @@ LaunchedEffect(uiState.galleryPermissionState) {
 - Cards para exibir resultados (imagens, URIs)
 - Dialogs para rationale e permissão bloqueada
 - Mensagens de erro
+
+**Funcionalidade de Abertura de Configurações**:
+- Observa o estado `shouldOpenSettings` do ViewModel
+- Abre automaticamente as configurações do app quando necessário
+- Verifica automaticamente o status da permissão quando o usuário volta das configurações
+- Atualiza o estado da UI se a permissão foi habilitada manualmente
 
 **Por que existe**: Esta é a única camada que interage diretamente com o sistema Android (launchers, Activity, Context). O ViewModel permanece puro e testável.
 
@@ -677,6 +687,29 @@ fun onPermissionResult(
 - Se `Denied`: Pode mostrar rationale e tentar novamente
 - Se `PermanentlyDenied`: Mostra dialog oferecendo ir para Configurações
 
+#### 9.1. Caso: Permissão Permanentemente Negada (Abertura de Configurações)
+```
+Se PermanentlyDenied:
+  ↓
+Dialog aparece com botão "Abrir Configurações"
+  ↓
+Usuário clica → viewModel.onOpenSettings(PermissionType.GALLERY)
+  ↓
+ViewModel emite: shouldOpenSettings = GALLERY
+  ↓
+LaunchedEffect detecta e abre configurações automaticamente
+  ↓
+Usuário habilita permissão nas configurações
+  ↓
+Usuário volta para o app
+  ↓
+LaunchedEffect detecta mudança e chama viewModel.recheckPermission()
+  ↓
+ViewModel verifica status novamente
+  ↓
+Se concedida: Estado atualizado para Granted, funcionalidade disponível
+```
+
 #### 10. Usuário Seleciona Imagem
 ```
 Photo Picker abre
@@ -903,13 +936,85 @@ if (shouldShowRationale) {
 - Oferecer botão para abrir Configurações do app
 - Usar `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`
 
-**Código**:
+**Código básico**:
 ```kotlin
 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
     data = Uri.fromParts("package", context.packageName, null)
 }
 context.startActivity(intent)
 ```
+
+---
+
+### 6. Abertura Automática de Configurações
+
+**O que é**: Funcionalidade implementada no app para abrir automaticamente as configurações do app quando uma permissão é permanentemente negada, e verificar automaticamente se foi habilitada quando o usuário volta.
+
+**Como funciona**:
+
+1. **ViewModel emite estado**:
+   ```kotlin
+   fun onOpenSettings(permissionType: PermissionType) {
+       _uiState.update { it.copy(shouldOpenSettings = permissionType) }
+   }
+   ```
+
+2. **UI observa e abre configurações**:
+   ```kotlin
+   LaunchedEffect(uiState.shouldOpenSettings) {
+       uiState.shouldOpenSettings?.let { permissionType ->
+           viewModel.onSettingsOpened()
+           openAppSettings(context)
+       }
+   }
+   ```
+
+3. **Verificação automática ao voltar**:
+   ```kotlin
+   LaunchedEffect(uiState.shouldOpenSettings, permissionTypeToRecheck) {
+       if (uiState.shouldOpenSettings == null && permissionTypeToRecheck != null) {
+           delay(300)
+           viewModel.recheckPermission(permissionTypeToRecheck)
+       }
+   }
+   ```
+
+**Fluxo completo**:
+```
+1. Usuário nega permissão permanentemente
+   ↓
+2. Dialog aparece: "Permissão bloqueada"
+   ↓
+3. Usuário clica em "Abrir Configurações"
+   ↓
+4. ViewModel.onOpenSettings(PermissionType.GALLERY)
+   ↓
+5. HomeUiState.shouldOpenSettings = GALLERY
+   ↓
+6. LaunchedEffect detecta e abre configurações automaticamente
+   ↓
+7. Usuário habilita permissão manualmente nas configurações
+   ↓
+8. Usuário volta para o app
+   ↓
+9. LaunchedEffect detecta que shouldOpenSettings voltou para null
+   ↓
+10. ViewModel.recheckPermission() verifica novamente o status
+   ↓
+11. Se concedida, estado é atualizado e funcionalidade pode ser usada
+```
+
+**Vantagens**:
+- ✅ Abre configurações automaticamente
+- ✅ Detecta quando usuário volta das configurações
+- ✅ Verifica automaticamente se permissão foi habilitada
+- ✅ Atualiza estado da UI automaticamente
+- ✅ Funciona para todos os tipos de permissão
+
+**Métodos do ViewModel relacionados**:
+- `onOpenSettings(permissionType)`: Emite estado para abrir configurações
+- `onSettingsOpened()`: Limpa estado após abrir
+- `recheckPermission(permissionType)`: Verifica novamente status da permissão
 
 ---
 
@@ -1016,6 +1121,92 @@ PermissionType.LOCATION -> {
 **Passo 3**: Adicionar permissão no `AndroidManifest.xml`
 ```xml
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+```
+
+---
+
+### 4. Implementar Abertura de Configurações
+
+**Para adicionar a funcionalidade de abrir configurações automaticamente:**
+
+**Passo 1**: Adicionar estado no seu `UiState`
+```kotlin
+data class MyUiState(
+    // ... outros estados
+    val shouldOpenSettings: PermissionType? = null
+)
+```
+
+**Passo 2**: Adicionar métodos no ViewModel
+```kotlin
+class MyViewModel : ViewModel() {
+    fun onOpenSettings(permissionType: PermissionType) {
+        _uiState.update { it.copy(shouldOpenSettings = permissionType) }
+    }
+    
+    fun onSettingsOpened() {
+        _uiState.update { it.copy(shouldOpenSettings = null) }
+    }
+    
+    fun recheckPermission(permissionType: PermissionType) {
+        viewModelScope.launch {
+            val status = checkPermissionUseCase(permissionType)
+            // Atualizar estado baseado no novo status
+        }
+    }
+}
+```
+
+**Passo 3**: Implementar na UI (Compose)
+```kotlin
+@Composable
+fun MyScreen(viewModel: MyViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var permissionTypeToRecheck by remember { mutableStateOf<PermissionType?>(null) }
+    
+    // Observa e abre configurações
+    LaunchedEffect(uiState.shouldOpenSettings) {
+        uiState.shouldOpenSettings?.let { permissionType ->
+            permissionTypeToRecheck = permissionType
+            viewModel.onSettingsOpened()
+            openAppSettings(context)
+        }
+    }
+    
+    // Verifica quando usuário volta
+    LaunchedEffect(uiState.shouldOpenSettings, permissionTypeToRecheck) {
+        if (uiState.shouldOpenSettings == null && permissionTypeToRecheck != null) {
+            delay(300)
+            viewModel.recheckPermission(permissionTypeToRecheck)
+            permissionTypeToRecheck = null
+        }
+    }
+}
+
+// Função auxiliar
+private fun openAppSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", context.packageName, null)
+    }
+    context.startActivity(intent)
+}
+```
+
+**Passo 4**: Usar no dialog de permissão bloqueada
+```kotlin
+if (permissionState is PermissionUiState.PermanentlyDenied) {
+    AlertDialog(
+        // ...
+        confirmButton = {
+            TextButton(onClick = {
+                viewModel.onOpenSettings(PermissionType.CAMERA)
+            }) {
+                Text("Abrir Configurações")
+            }
+        }
+    )
+}
 ```
 
 ---

@@ -1,6 +1,7 @@
 package com.estudos.permissionsappexemple.presentation.ui.state
 
 import android.net.Uri
+import com.estudos.permissionsappexemple.domain.model.PermissionType
 
 /**
  * Estado da UI da tela principal (HomeScreen).
@@ -23,7 +24,10 @@ data class HomeUiState(
     
     // Estados de operação
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    
+    // Controle de abertura de configurações
+    val shouldOpenSettings: PermissionType? = null
 ) {
     /**
      * Verifica se há alguma imagem selecionada para exibir
@@ -35,4 +39,5 @@ data class HomeUiState(
      */
     fun getCurrentImageUri(): Uri? = cameraImageUri ?: selectedImageUri
 }
+
 

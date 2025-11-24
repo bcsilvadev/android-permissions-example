@@ -1,12 +1,11 @@
 package com.estudos.permissionsappexemple.di
 
-import android.content.Context
 import com.estudos.permissionsappexemple.data.manager.CameraManager
 import com.estudos.permissionsappexemple.data.repository.PermissionRepository
 import com.estudos.permissionsappexemple.data.repository.PermissionRepositoryImpl
 import com.estudos.permissionsappexemple.domain.usecase.CheckPermissionUseCase
 import com.estudos.permissionsappexemple.domain.usecase.GetRequiredPermissionsUseCase
-import com.estudos.permissionsappexemple.presentation.viewmodel.HomeViewModel
+import com.estudos.permissionsappexemple.presentation.ui.viewmodel.HomeViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.dsl.bind
@@ -54,4 +53,5 @@ val appModule = module {
     // ViewModels
     viewModel { HomeViewModel(get(), get()) }
 }
+
 

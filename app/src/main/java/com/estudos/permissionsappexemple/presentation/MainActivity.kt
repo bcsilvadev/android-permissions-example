@@ -12,7 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.estudos.permissionsappexemple.presentation.ui.screen.HomeScreen
 import com.estudos.permissionsappexemple.presentation.ui.theme.PermissionsAppTheme
-import com.estudos.permissionsappexemple.presentation.viewmodel.HomeViewModel
+import com.estudos.permissionsappexemple.presentation.ui.viewmodel.HomeViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 /**
@@ -74,4 +74,5 @@ class MainActivity : ComponentActivity() {
 sealed class Routes(val route: String) {
     object Home : Routes("home")
 }
+
 

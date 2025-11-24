@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,8 +25,8 @@ import coil.compose.AsyncImage
 import com.estudos.permissionsappexemple.data.manager.CameraManager
 import com.estudos.permissionsappexemple.domain.model.PermissionType
 import com.estudos.permissionsappexemple.presentation.ui.state.PermissionUiState
-import com.estudos.permissionsappexemple.presentation.viewmodel.HomeViewModel
-import com.estudos.permissionsappexemple.presentation.viewmodel.OperationSource
+import com.estudos.permissionsappexemple.presentation.ui.viewmodel.HomeViewModel
+import com.estudos.permissionsappexemple.presentation.ui.viewmodel.OperationSource
 import kotlinx.coroutines.launch
 
 /**
@@ -144,6 +145,72 @@ fun HomeScreen(
         }
     }
     
+    // ========== ABERTURA DE CONFIGURAÇÕES ==========
+    
+    /**
+     * Observa o estado shouldOpenSettings e abre as configurações quando necessário.
+     * 
+     * Quando o ViewModel emite shouldOpenSettings, este LaunchedEffect abre
+     * as configurações do app para que o usuário possa habilitar a permissão manualmente.
+     */
+    LaunchedEffect(uiState.shouldOpenSettings) {
+        uiState.shouldOpenSettings?.let { permissionType ->
+            // Notifica ViewModel que as configurações estão sendo abertas
+            viewModel.onSettingsOpened()
+            
+            // Abre as configurações do app
+            openAppSettings(context)
+        }
+    }
+    
+    /**
+     * Variável para rastrear qual permissão teve as configurações abertas.
+     * Usada para verificar permissão quando o usuário volta das configurações.
+     */
+    var permissionTypeToRecheck by remember { mutableStateOf<PermissionType?>(null) }
+    
+    /**
+     * Observa o estado shouldOpenSettings e abre as configurações quando necessário.
+     * Também armazena qual permissão precisa ser verificada quando o usuário voltar.
+     */
+    LaunchedEffect(uiState.shouldOpenSettings) {
+        uiState.shouldOpenSettings?.let { permissionType ->
+            // Armazena qual permissão precisa ser verificada quando voltar
+            permissionTypeToRecheck = permissionType
+            
+            // Notifica ViewModel que as configurações estão sendo abertas
+            viewModel.onSettingsOpened()
+            
+            // Abre as configurações do app
+            openAppSettings(context)
+        }
+    }
+    
+    /**
+     * Verifica novamente o status da permissão quando shouldOpenSettings volta para null.
+     * 
+     * Quando onSettingsOpened() é chamado, shouldOpenSettings volta para null.
+     * Isso indica que as configurações foram abertas. Quando o usuário volta,
+     * verificamos se a permissão foi habilitada.
+     * 
+     * NOTA: A verificação real acontece quando o usuário interage novamente com o app
+     * (ex: clica no botão novamente), mas também podemos verificar automaticamente
+     * quando detectamos que shouldOpenSettings voltou para null.
+     */
+    LaunchedEffect(uiState.shouldOpenSettings, permissionTypeToRecheck) {
+        // Se shouldOpenSettings voltou para null e temos uma permissão para verificar
+        if (uiState.shouldOpenSettings == null && permissionTypeToRecheck != null) {
+            // Pequeno delay para garantir que a Activity voltou ao foco
+            kotlinx.coroutines.delay(300)
+            // Verifica novamente o status da permissão
+            permissionTypeToRecheck?.let { permissionType ->
+                viewModel.recheckPermission(permissionType)
+            }
+            // Limpa o estado
+            permissionTypeToRecheck = null
+        }
+    }
+    
     // ========== REAÇÃO AOS ESTADOS DE PERMISSÃO ==========
     
     /**
@@ -160,7 +227,9 @@ fun HomeScreen(
                     } else {
                         // Sem permissões necessárias, prossegue direto
                         galleryImagePicker.launch(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                            PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
                         )
                     }
                 }
@@ -168,13 +237,17 @@ fun HomeScreen(
             is PermissionUiState.Granted -> {
                 // Permissão concedida, abre o seletor de imagens
                 galleryImagePicker.launch(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                    PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
                 )
             }
             is PermissionUiState.NotRequired -> {
                 // Permissão não necessária (ex: Photo Picker em Android 13+)
                 galleryImagePicker.launch(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                    PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                    )
                 )
             }
             else -> { /* Outros estados são tratados na UI */ }
@@ -343,7 +416,8 @@ fun HomeScreen(
             
             uiState.galleryPermissionState.ShowPermanentlyDeniedDialog(
                 onOpenSettings = {
-                    openAppSettings(context)
+                    // Chama o método do ViewModel que emite o estado shouldOpenSettings
+                    viewModel.onOpenSettings(PermissionType.GALLERY)
                     viewModel.resetPermissionState(PermissionType.GALLERY)
                 },
                 onDismiss = { viewModel.resetPermissionState(PermissionType.GALLERY) }
@@ -351,7 +425,8 @@ fun HomeScreen(
             
             uiState.cameraPermissionState.ShowPermanentlyDeniedDialog(
                 onOpenSettings = {
-                    openAppSettings(context)
+                    // Chama o método do ViewModel que emite o estado shouldOpenSettings
+                    viewModel.onOpenSettings(PermissionType.CAMERA)
                     viewModel.resetPermissionState(PermissionType.CAMERA)
                 },
                 onDismiss = { viewModel.resetPermissionState(PermissionType.CAMERA) }
