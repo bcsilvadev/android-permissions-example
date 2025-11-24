@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths configuration.
+    Define os caminhos onde o FileProvider pode criar e compartilhar arquivos.
+    Isso é necessário para compartilhar URIs de arquivos com outros apps (ex: câmera).
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        external-files-path: Diretório de arquivos externos do app
+        path="." significa a raiz do diretório de arquivos externos
+    -->
+    <external-files-path
+        name="my_images"
+        path="Pictures" />
+    
+    <!--
+        cache-path: Diretório de cache do app
+        Útil para arquivos temporários
+    -->
+    <cache-path
+        name="my_cache"
+        path="." />
+</paths>
+
