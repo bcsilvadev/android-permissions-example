@@ -407,11 +407,17 @@ fun HomeScreen(
             
             // Dialogs de rationale e erro
             uiState.galleryPermissionState.ShowRationaleDialog(
-                onDismiss = { viewModel.resetPermissionState(PermissionType.GALLERY) }
+                onDismiss = { 
+                    // Quando usuário cancela o rationale, reseta o estado
+                    viewModel.resetPermissionState(PermissionType.GALLERY) 
+                }
             )
             
             uiState.cameraPermissionState.ShowRationaleDialog(
-                onDismiss = { viewModel.resetPermissionState(PermissionType.CAMERA) }
+                onDismiss = { 
+                    // Quando usuário cancela o rationale, reseta o estado
+                    viewModel.resetPermissionState(PermissionType.CAMERA) 
+                }
             )
             
             uiState.galleryPermissionState.ShowPermanentlyDeniedDialog(
@@ -484,6 +490,16 @@ private fun ActionButton(
 
 /**
  * Extension function para mostrar dialog de rationale.
+ * 
+ * Este dialog é exibido quando o usuário negou a permissão anteriormente,
+ * mas ainda pode ser convencido (shouldShowRationale = true).
+ * 
+ * FLUXO:
+ * 1. Usuário nega permissão → shouldShowRationale = true
+ * 2. ViewModel emite ShowRationale com callbacks
+ * 3. Este dialog é exibido
+ * 4. Se usuário clica "Entendi" → onConfirm() → requestPermissionAgain() → solicita permissão novamente
+ * 5. Se usuário clica "Cancelar" → onDismiss() → reseta estado
  */
 @Composable
 private fun PermissionUiState.ShowRationaleDialog(

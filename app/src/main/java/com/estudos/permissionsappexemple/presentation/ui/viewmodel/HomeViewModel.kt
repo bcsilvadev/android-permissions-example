@@ -54,6 +54,10 @@ class HomeViewModel(
      * Este método:
      * 1. Verifica se a permissão está concedida
      * 2. Emite o estado apropriado para a UI reagir
+     * 
+     * NOTA: O estado ShowRationale não é emitido aqui porque ele só aparece
+     * após o usuário negar a permissão pela primeira vez. O rationale é
+     * detectado no método onPermissionResult() quando shouldShowRationale é true.
      */
     fun onSelectGalleryImage() {
         viewModelScope.launch {
@@ -127,32 +131,63 @@ class HomeViewModel(
         shouldShowRationale: Boolean
     ) {
         viewModelScope.launch {
-            val newStatus = if (granted) {
-                PermissionStatus.Granted
-            } else if (shouldShowRationale) {
-                // Usuário negou, mas ainda pode ser convencido
-                PermissionStatus.Denied
-            } else {
-                // Usuário negou permanentemente (marcou "Não perguntar novamente")
-                PermissionStatus.PermanentlyDenied
-            }
-            
             val rationaleMessage = when (permissionType) {
-                PermissionType.GALLERY -> "Precisamos de acesso à galeria para selecionar imagens."
-                PermissionType.CAMERA -> "Precisamos de acesso à câmera para tirar fotos."
+                PermissionType.GALLERY -> "Precisamos de acesso à galeria para selecionar imagens. Por favor, permita o acesso nas configurações de permissão."
+                PermissionType.CAMERA -> "Precisamos de acesso à câmera para tirar fotos. Por favor, permita o acesso nas configurações de permissão."
                 PermissionType.FILE_PICKER -> ""
             }
             
-            val uiState = newStatus.toUiState(
-                rationaleMessage = rationaleMessage,
-                onOpenSettings = { onOpenSettings(permissionType) }
-            )
+            val uiState = if (granted) {
+                // Permissão concedida
+                PermissionUiState.Granted
+            } else if (shouldShowRationale) {
+                // Usuário negou, mas ainda pode ser convencido - mostrar rationale
+                PermissionUiState.ShowRationale(
+                    message = rationaleMessage,
+                    onConfirm = {
+                        // Quando usuário confirma o rationale, solicita permissão novamente
+                        requestPermissionAgain(permissionType)
+                    },
+                    onDismiss = {
+                        // Quando usuário cancela, reseta o estado
+                        resetPermissionState(permissionType)
+                    }
+                )
+            } else {
+                // Usuário negou permanentemente (marcou "Não perguntar novamente")
+                PermissionUiState.PermanentlyDenied(
+                    message = rationaleMessage,
+                    onOpenSettings = { onOpenSettings(permissionType) }
+                )
+            }
             
             _uiState.update { state ->
                 when (permissionType) {
                     PermissionType.GALLERY -> state.copy(galleryPermissionState = uiState)
                     PermissionType.CAMERA -> state.copy(cameraPermissionState = uiState)
                     PermissionType.FILE_PICKER -> state.copy(filePickerPermissionState = uiState)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Solicita permissão novamente após o usuário ver o rationale e confirmar.
+     * 
+     * Este método é chamado quando o usuário confirma o dialog de rationale,
+     * indicando que entendeu a necessidade da permissão e quer tentar novamente.
+     * 
+     * @param permissionType Tipo de permissão a solicitar novamente
+     */
+    private fun requestPermissionAgain(permissionType: PermissionType) {
+        viewModelScope.launch {
+            // Emite estado RequestPermission para que a UI solicite a permissão novamente
+            _uiState.update { state ->
+                val requestState = PermissionUiState.RequestPermission
+                when (permissionType) {
+                    PermissionType.GALLERY -> state.copy(galleryPermissionState = requestState)
+                    PermissionType.CAMERA -> state.copy(cameraPermissionState = requestState)
+                    PermissionType.FILE_PICKER -> state.copy(filePickerPermissionState = requestState)
                 }
             }
         }
