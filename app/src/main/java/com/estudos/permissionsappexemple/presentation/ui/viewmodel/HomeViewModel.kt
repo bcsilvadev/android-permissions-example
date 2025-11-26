@@ -198,8 +198,9 @@ class HomeViewModel(
      * 
      * @param uri URI do arquivo/imagem selecionado
      * @param source Origem da seleção (gallery, camera, file)
+     * @param fileName Nome do arquivo (opcional, principalmente para FILE_PICKER)
      */
-    fun onOperationResult(uri: Uri?, source: OperationSource) {
+    fun onOperationResult(uri: Uri?, source: OperationSource, fileName: String? = null) {
         _uiState.update { state ->
             when (source) {
                 OperationSource.GALLERY -> state.copy(
@@ -212,6 +213,7 @@ class HomeViewModel(
                 )
                 OperationSource.FILE_PICKER -> state.copy(
                     selectedFileUri = uri,
+                    selectedFileName = fileName,
                     filePickerPermissionState = PermissionUiState.Granted
                 )
             }

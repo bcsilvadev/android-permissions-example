@@ -20,6 +20,7 @@ data class HomeUiState(
     // Resultados das operações
     val selectedImageUri: Uri? = null,
     val selectedFileUri: Uri? = null,
+    val selectedFileName: String? = null,  // Nome do arquivo selecionado
     val cameraImageUri: Uri? = null,
     
     // Estados de operação

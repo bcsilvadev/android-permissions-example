@@ -297,3 +297,4 @@ permissionLauncher.launch(permission)
 - O resultado é passado para o ViewModel
 - O ViewModel usa para decidir entre mostrar rationale ou oferecer abrir Configurações
 
+

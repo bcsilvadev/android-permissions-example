@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.estudos.permissionsappexemple.data.manager.CameraManager
+import com.estudos.permissionsappexemple.data.util.FileUtils
 import com.estudos.permissionsappexemple.domain.model.PermissionType
 import com.estudos.permissionsappexemple.presentation.ui.state.PermissionUiState
 import com.estudos.permissionsappexemple.presentation.ui.viewmodel.HomeViewModel
@@ -128,7 +129,9 @@ fun HomeScreen(
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        viewModel.onOperationResult(uri, OperationSource.FILE_PICKER)
+        // Extrai o nome do arquivo da URI
+        val fileName = uri?.let { FileUtils.getFileName(context, it) }
+        viewModel.onOperationResult(uri, OperationSource.FILE_PICKER, fileName)
     }
     
     /**
@@ -146,22 +149,6 @@ fun HomeScreen(
     }
     
     // ========== ABERTURA DE CONFIGURAÇÕES ==========
-    
-    /**
-     * Observa o estado shouldOpenSettings e abre as configurações quando necessário.
-     * 
-     * Quando o ViewModel emite shouldOpenSettings, este LaunchedEffect abre
-     * as configurações do app para que o usuário possa habilitar a permissão manualmente.
-     */
-    LaunchedEffect(uiState.shouldOpenSettings) {
-        uiState.shouldOpenSettings?.let { permissionType ->
-            // Notifica ViewModel que as configurações estão sendo abertas
-            viewModel.onSettingsOpened()
-            
-            // Abre as configurações do app
-            openAppSettings(context)
-        }
-    }
     
     /**
      * Variável para rastrear qual permissão teve as configurações abertas.
@@ -396,11 +383,36 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = uiState.selectedFileUri.toString(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        
+                        // Exibe o nome do arquivo se disponível
+                        if (uiState.selectedFileName != null) {
+                            Text(
+                                text = "Nome: ${uiState.selectedFileName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                        
+                        // Exibe informações adicionais (tamanho, se disponível)
+                        uiState.selectedFileUri?.let { uri ->
+                            val fileSize = FileUtils.getFileSize(context, uri)
+                            if (fileSize != null) {
+                                Text(
+                                    text = "Tamanho: ${FileUtils.formatFileSize(fileSize)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            
+                            // URI completa (para debug/informação)
+                            Text(
+                                text = "URI: ${uri.toString()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
